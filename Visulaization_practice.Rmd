@@ -1,0 +1,159 @@
+---
+title: "Conceptual map visualization"
+author: "Jamie Tam"
+Modified: "Vahab Pourfaraj"
+date modified: '2022-08-02'
+Sources: https://github.com/NEFSC/READ-SSB-DePiper_Summer_Flounder_Conceptual_Models/blob/master/sfconsmod_final_2col.Rmd
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r}
+require(igraph)
+require(tidyverse)
+require(visNetwork)
+require(chorddiag)
+require(circlize)
+require(RColorBrewer)
+```
+
+## Kumu conversion into usable R for visulaization, Qpress and more
+
+### visNetwork visulaization
+
+Specify "strength"(a column of connection table in kumu) as weighted and numeric and export connection table either as csv or xlsx.
+
+```{r}
+kumu.data<-read_csv("IMSES-subset-test_AUG2.csv")
+kumu.data<-kumu.data[,c(1,2,8)] #save columns "From", "To" and "Strength"
+kumu.graph<- graph_from_data_frame(kumu.data,directed = TRUE, vertices = NULL ) #this line added to convert data to a graph object for next line
+kumu.adj.mat<-as_adjacency_matrix(kumu.graph, attr= "Strength" , sparse=FALSE) 
+IMSES.names<-row.names(kumu.adj.mat) # to store node names before renaming
+rownames(kumu.adj.mat)<-c(1:57)
+colnames(kumu.adj.mat)<-c(1:57)
+kumu.g<-graph.adjacency(kumu.adj.mat) #Create graphs from adjacency matrices
+nodes <- data.frame(id = 1:57, label=IMSES.names, stringsAsFactors = FALSE)# exported this df and added group columns, there has to be an easier way to do this!
+nodes<- read.csv("pilars.csv")
+nodes$font.size<-20
+edges <- data.frame(get.edgelist(kumu.g)) #Creates adjacency lists from a graph
+colnames(edges)<-c("from","to")
+
+
+visNetwork(nodes, edges, main = "Title to be added", height = "600px", width="100%") %>%
+  visEdges(arrows="to") %>%
+  visIgraphLayout() %>%
+  visNodes(size = 40) %>%
+  visOptions(selectedBy = "group", 
+             highlightNearest = TRUE, 
+             nodesIdSelection = TRUE) %>%
+  visInteraction(keyboard = TRUE,
+                 dragNodes = T, 
+                 dragView = T, 
+                 zoomView = T)  %>%
+                  visLegend()
+
+
+visNetwork(nodes, edges, height = "500px") %>%
+  visIgraphLayout() %>%
+  visNodes(size = 10) %>%
+  visOptions(highlightNearest = list(enabled = T, hover = T), 
+             nodesIdSelection = T)
+```
+
+## Static chordiag (chordDiagram function) with circlize packge
+
+```{r}
+kumu.data<-read_csv("IMSES-subset-test_AUG2.csv")
+kumu.data<-kumu.data[,c(1,2,8)] #save columns "From", "To" and "Strength"
+kumu.graph<- graph_from_data_frame(kumu.data,directed = TRUE, vertices = NULL ) #this line added to convert data to a graph object for next line
+kumu.adj.mat<-as_adjacency_matrix(kumu.graph, attr= "Strength" , sparse=FALSE)
+
+
+nodes<- read.csv("pilars.csv")
+climate_dim <- filter(nodes, group=="Climate")
+climate_nodes<- climate_dim$label
+
+ecol_dim <- filter(nodes, group=="Ecological")
+ecol_nodes<- ecol_dim$label
+
+gov_dim <- filter(nodes, group=="Governance")
+gov_nodes<- gov_dim$label
+
+rights_dim <- filter(nodes, group=="Indeginous rights & reconciliation")
+rights_nodes<- rights_dim$label
+
+econ_dim <- filter(nodes, group=="Economic")
+econ_nodes<- econ_dim$label
+
+social_dim <- filter(nodes, group=="Socio-cultural")
+social_nodes<- social_dim$label
+
+nodescolorselect <- brewer.pal(6, "Dark2")
+mapcolordf <- data.frame(row.names(kumu.adj.mat))
+colnames(mapcolordf) <- "focus"
+
+mapcolordf$color <- nodescolorselect[1]
+mapcolordf$color[mapcolordf$focus%in%ecol_nodes] <- nodescolorselect[2] 
+mapcolordf$color[mapcolordf$focus%in%gov_nodes] <- nodescolorselect[3] 
+mapcolordf$color[mapcolordf$focus%in%rights_nodes] <- nodescolorselect[4] 
+mapcolordf$color[mapcolordf$focus%in%econ_nodes] <- nodescolorselect[5] 
+mapcolordf$color[mapcolordf$focus%in%social_nodes] <- nodescolorselect[6] 
+
+IMSES_Groups <- mapcolordf
+
+IMSES_Groups$Group <- "Climate"
+IMSES_Groups$Rank <- 1
+IMSES_Groups$Group[IMSES_Groups$focus%in%ecol_nodes] <- "Ecological"
+IMSES_Groups$Rank[IMSES_Groups$focus%in%ecol_nodes] <- 2
+IMSES_Groups$Group[IMSES_Groups$focus%in%gov_nodes] <- "Governance"
+IMSES_Groups$Rank[IMSES_Groups$focus%in%gov_nodes] <- 3
+IMSES_Groups$Group[IMSES_Groups$focus%in%rights_nodes] <- "Indeginous rights & reconciliation"
+IMSES_Groups$Rank[IMSES_Groups$focus%in%rights_nodes] <- 4
+IMSES_Groups$Group[IMSES_Groups$focus%in%econ_nodes] <- "Economic"
+IMSES_Groups$Rank[IMSES_Groups$focus%in%econ_nodes] <- 5
+IMSES_Groups$Group[IMSES_Groups$focus%in%social_nodes] <- "Socio-cultural"
+IMSES_Groups$Rank[IMSES_Groups$focus%in%social_nodes] <- 6
+
+map_edges <- cbind(kumu.adj.mat,mapcolordf)
+mapcolordf <- mapcolordf[order(mapcolordf$color,mapcolordf$focus),]
+mapcolordf <- matrix(mapcolordf$color,dimnames=list(mapcolordf$focus,"Color"))
+map_edges <-  map_edges[order( map_edges$color,map_edges$focus),]
+
+map_edges$color <- NULL
+map_edges$focus <- NULL
+map_edges <- data.matrix(map_edges)
+Border_mat <- matrix(1,nrow=nrow(map_edges),ncol=ncol(map_edges))
+rownames(Border_mat) <- rownames(map_edges)
+colnames(Border_mat) <- colnames(map_edges)
+Border_Col <- matrix("white",nrow=nrow(map_edges),ncol=ncol(map_edges))
+rownames(Border_Col) <- rownames(map_edges)
+colnames(Border_Col) <- colnames(map_edges)
+Border_w <- matrix(.0001,nrow=nrow(map_edges),ncol=ncol(map_edges))
+rownames(Border_w) <- rownames(map_edges)
+colnames(Border_w) <- colnames(map_edges)
+
+
+#full conceptual model in circlize package
+chordDiagram(map_edges, directional=0,
+             grid.col = mapcolordf,
+             row.col = mapcolordf,
+             link.lty = Border_mat,
+             link.lwd = Border_w,
+             link.border = Border_Col,
+             annotationTrack="grid",preAllocateTracks= list(track.height=0.5))
+circos.trackPlotRegion(track.index=1, panel.fun= function (x,y){
+  xlim = get.cell.meta.data("xlim")
+  ylim = get.cell.meta.data("ylim")
+  sector.name = get.cell.meta.data("sector.index")
+  circos.text(mean(xlim),ylim[1],sector.name,facing="clockwise", niceFacing=TRUE, adj =c(0,0.5), cex=.6)
+}, bg.border=NA) 
+legend (x=1.1,y = 1,legend = c("Climate","Ecological","Governance","Indeginous rights & reconciliation","Economic","Socio-cultural"),
+       lty= c(1,1,1,1,1,1), lwd=c(5,5,5,5,5,5),
+       col =c(nodescolorselect[1],nodescolorselect[2],nodescolorselect[3],nodescolorselect[4],nodescolorselect[5],nodescolorselect[6], ncol=1, cex = .15, bg = NULL, box.col=NULL, bty = "n"))
+title(main="Map title", line=-1)
+```
+
+
