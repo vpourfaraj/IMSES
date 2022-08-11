@@ -11,57 +11,81 @@ output: html_document
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
+# Setup packages
 ```{r}
 require(igraph)
 require(tidyverse)
+require(readxl)
 require(visNetwork)
 require(chorddiag)
 require(circlize)
 require(RColorBrewer)
 ```
 
-## Kumu conversion into usable R for visulaization, Qpress and more
 
-### visNetwork visulaization
+# visNetwork visulaization
 
 Specify "strength"(a column of connection table in kumu) as weighted and numeric and export connection table either as csv or xlsx.
-
+## Setup for VisNetwork Kumu conversion from .xlsx into R
 ```{r}
-kumu.data<-read_csv("IMSES-subset-test_AUG2.csv")
-kumu.data<-kumu.data[,c(1,2,8)] #save columns "From", "To" and "Strength"
-kumu.graph<- graph_from_data_frame(kumu.data,directed = TRUE, vertices = NULL ) #this line added to convert data to a graph object for next line
+
+kumu.data.e<-read_excel("kumu_test_jct01.xlsx", sheet=1)#reads element table from kumu output
+kumu.data.c<-read_excel("kumu_test_jct01.xlsx", sheet=2)#reads connections table from kumu output
+kumu.data.c<-kumu.data.c[,c(1,2,8)] #save columns "From", "To" and "Strength"
+kumu.graph<- graph_from_data_frame(kumu.data.c,directed = TRUE, vertices = NULL ) #this line added to convert data to a graph object for next line
 kumu.adj.mat<-as_adjacency_matrix(kumu.graph, attr= "Strength" , sparse=FALSE) 
-IMSES.names<-row.names(kumu.adj.mat) # to store node names before renaming
+IMSES.names<-row.names(kumu.adj.mat)# to store node names before renaming
 rownames(kumu.adj.mat)<-c(1:57)
 colnames(kumu.adj.mat)<-c(1:57)
 kumu.g<-graph.adjacency(kumu.adj.mat) #Create graphs from adjacency matrices
-nodes <- data.frame(id = 1:57, label=IMSES.names, stringsAsFactors = FALSE)# exported this df and added group columns, there has to be an easier way to do this!
-nodes<- read.csv("pilars.csv")
-nodes$font.size<-20
+ 
+nodes<-kumu.data.e %>% 
+  select(Label,Type) %>% 
+   rename(label=Label,group=Type) %>%
+   add_column (id=1:57, font.size=40)%>%
+    arrange(id, label, group, font.size)
+                        
+
 edges <- data.frame(get.edgelist(kumu.g)) #Creates adjacency lists from a graph
 colnames(edges)<-c("from","to")
 
 
-visNetwork(nodes, edges, main = "Title to be added", height = "600px", width="100%") %>%
-  visEdges(arrows="to") %>%
+```
+
+## VisNetwork graphs
+```{r}
+
+# visNetwork(nodes, edges, main = "Interactional Map of the Social-ecological system",
+#             submain = "American lobsters (Homarus americanus)", height = "600px", width="100%") %>%
+#   visEdges(arrows="to") %>%
+#   visIgraphLayout() %>%
+#   visNodes(size = 20) %>%
+#   visOptions(selectedBy = "group", 
+#              highlightNearest = TRUE, 
+#              nodesIdSelection = TRUE) %>%
+#   visInteraction(keyboard = TRUE,
+#                  dragNodes = T, 
+#                  dragView = T, 
+#                  zoomView = T)  %>%
+#                   visLegend(width=0.1, position="right", main="Group")
+
+
+IMSES_net<-visNetwork(nodes, edges, height = "600px", width="100%") %>%
   visIgraphLayout() %>%
-  visNodes(size = 40) %>%
-  visOptions(selectedBy = "group", 
-             highlightNearest = TRUE, 
-             nodesIdSelection = TRUE) %>%
+  visEdges(arrows="to") %>%
+  visNodes(size = 20) %>%
+  visOptions(highlightNearest = list(enabled = T, hover = T), 
+             nodesIdSelection = F) %>%
   visInteraction(keyboard = TRUE,
                  dragNodes = T, 
                  dragView = T, 
                  zoomView = T)  %>%
-                  visLegend()
+                  visLegend(width=0.1, position="right", main="Group")
 
-
-visNetwork(nodes, edges, height = "500px") %>%
-  visIgraphLayout() %>%
-  visNodes(size = 10) %>%
-  visOptions(highlightNearest = list(enabled = T, hover = T), 
-             nodesIdSelection = T)
+custom_network <- visNetworkEditor(object = IMSES_net)
+custom_network
 ```
+
 
 ## Static chordiag (chordDiagram function) with circlize packge
 
