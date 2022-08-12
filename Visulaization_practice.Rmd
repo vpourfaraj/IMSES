@@ -35,7 +35,7 @@ kumu.data.c<-read_excel("kumu_test_jct01.xlsx", sheet=2)#reads connections table
 kumu.mat<-kumu.data.c %>%
             select (From, To) %>%
             add_column(Strength=1) %>%#adds extra column for edgelist
-            arrange(From) %>%
+            arrange(From) %>% #arranges to alphabetical so that ID numbers match
             graph_from_data_frame(directed = TRUE, vertices = NULL) %>% #this line added to convert data to a graph object for next line
   as_adjacency_matrix(attr= "Strength" , sparse=FALSE) 
 
@@ -43,15 +43,22 @@ rownames(kumu.mat)<-c(1:57)
 colnames(kumu.mat)<-c(1:57)
             
 kumu.g<-graph.adjacency(kumu.mat) #Create graphs from adjacency matrices
-edges <- data.frame(get.edgelist(kumu.g))
-colnames(edges)<-c("from","to")
+edges <- data.frame(get.edgelist(kumu.g)) %>%
+          rename(from=X1, to=X2) %>%
+          add_column(arrows="to", smooth="TRUE", shadow="TRUE")
+
+
+# node.colour<-kumu.data.e %>%
+#               select(Type) %>%
+#               mutate(color=case_when(startsWith(Type, "c")~ "blue"))
+              
                         
  
 nodes<-kumu.data.e %>%
   select(Label,Type) %>%
   arrange(Label)%>%
    rename(label=Label,group=Type) %>%
-   add_column (id=1:57, font.size=40)%>%
+   add_column (id=1:57, shape="ellipse")%>%
     relocate(id)
 
 
@@ -73,7 +80,7 @@ nodes<-kumu.data.e %>%
 #                  dragView = T, 
 #                  zoomView = T)  %>%
 #                   visLegend(width=0.1, position="right", main="Group")
-
+visNetwork(nodes, edges, height = "600px", width = "100%")
 
 visNetwork(nodes, edges, height = "600px", width="100%") %>%
   visIgraphLayout() %>%
