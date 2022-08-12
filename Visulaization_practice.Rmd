@@ -30,8 +30,8 @@ Specify "strength"(a column of connection table in kumu) as weighted and numeric
 ```{r}
 
 
-kumu.data.e<-read_excel("kumu_test_jct01.xlsx", sheet=1) #reads element table from kumu output
-kumu.data.c<-read_excel("kumu_test_jct01.xlsx", sheet=2)#reads connections table from kumu output
+kumu.data.e<-read_excel("kumu-jamiectam-imses-in-progress-extra-fishery.xlsx", sheet=1) #reads element table from kumu output
+kumu.data.c<-read_excel("kumu-jamiectam-imses-in-progress-extra-fishery.xlsx", sheet=2)#reads connections table from kumu output
 kumu.mat<-kumu.data.c %>%
             select (From, To) %>%
             add_column(Strength=1) %>%#adds extra column for edgelist
@@ -58,9 +58,10 @@ nodes<-kumu.data.e %>%
   select(Label,Type) %>%
   arrange(Label)%>%
    rename(label=Label,group=Type) %>%
-   add_column (id=1:57, shape="ellipse")%>%
+   add_column (id=1:57, shape="circle")%>%
     relocate(id)
-
+#adds blank space to node labels with less than 50 characters
+nodes$label<- str_pad(nodes$label, 50, "both") #adds extra space for nodes with short names
 
 ```
 
@@ -80,8 +81,19 @@ nodes<-kumu.data.e %>%
 #                  dragView = T, 
 #                  zoomView = T)  %>%
 #                   visLegend(width=0.1, position="right", main="Group")
-visNetwork(nodes, edges, height = "600px", width = "100%")
 
+#visNetwork with manually selected colors for each dimension
+#------------------------------------------------------------
+visNetwork(nodes, edges, height = "600px", width = "100%") %>%
+    visIgraphLayout() %>%
+visGroups(groupname = "Economic", color= "red") %>%
+  visGroups(groupname = "Ecological", color= "pink") %>%
+  visGroups(groupname = "Climate", color= "lightblue") %>%
+  visGroups(groupname = "Social/cultural", color= "grey") %>%
+  visGroups(groupname = "Indigenous Rights and Reconciliation", color= "green") %>%
+  visGroups(groupname = "Institutional", color= "orange") %>%
+  visLegend(width=0.1, position="right", main="Group")
+#------------------------------------------------------------------
 visNetwork(nodes, edges, height = "600px", width="100%") %>%
   visIgraphLayout() %>%
   visEdges(arrows="to") %>%
